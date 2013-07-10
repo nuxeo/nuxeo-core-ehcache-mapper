@@ -89,6 +89,12 @@ public class UnifiedCachingMapper extends UnifiedCachingRowMapper implements
     }
 
     @Override
+    public Serializable getVersionIdByLabel(Serializable versionSeriesId,
+            String label) throws StorageException {
+        return mapper.getVersionIdByLabel(versionSeriesId, label);
+    }
+
+    @Override
     public PartialList<Serializable> query(String query, String queryType,
             QueryFilter queryFilter, boolean countTotal)
             throws StorageException {
@@ -96,21 +102,15 @@ public class UnifiedCachingMapper extends UnifiedCachingRowMapper implements
     }
 
     @Override
-    public PartialList<Serializable> query(String query, String queryType,
-            QueryFilter queryFilter, long countUpTo) throws StorageException {
-        return mapper.query(query, queryType, queryFilter, countUpTo);
+    public Serializable getLastVersionId(Serializable versionSeriesId)
+            throws StorageException {
+        return mapper.getLastVersionId(versionSeriesId);
     }
 
     @Override
     public IterableQueryResult queryAndFetch(String query, String queryType,
             QueryFilter queryFilter, Object... params) throws StorageException {
         return mapper.queryAndFetch(query, queryType, queryFilter, params);
-    }
-
-    @Override
-    public Set<Serializable> getAncestorsIds(Collection<Serializable> ids)
-            throws StorageException {
-        return mapper.getAncestorsIds(ids);
     }
 
     @Override

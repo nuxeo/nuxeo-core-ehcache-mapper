@@ -5,54 +5,71 @@
 
   <parent>
     <groupId>org.nuxeo</groupId>
-    <artifactId>nuxeo-addons-parent</artifactId>
-    <version>5.6-SNAPSHOT</version>
+    <artifactId>nuxeo-addons-list</artifactId>
+    <version>5.4.2-HF28</version>
   </parent>
 
   <groupId>org.nuxeo.ecm.core</groupId>
   <artifactId>nuxeo-core-ehcache-mapper</artifactId>
   <name>Nuxeo Core ehcache Mapper</name>
+  <version>5.4.2-HF28-NXP-9574-SNAPSHOT</version>
   <description>Caching Mapper implemented with an unified ehcache</description>
+
+  <properties>
+    <nuxeo.common.version>5.4.2-HF28</nuxeo.common.version>
+    <nuxeo.runtime.version>5.4.2-HF28</nuxeo.runtime.version>
+    <nuxeo.core.version>5.4.2-HF28</nuxeo.core.version>
+  </properties>
 
   <dependencies>
     <dependency>
       <groupId>org.nuxeo.common</groupId>
       <artifactId>nuxeo-common</artifactId>
+      <version>${nuxeo.common.version}</version>
     </dependency>
     <dependency>
       <groupId>org.nuxeo.runtime</groupId>
       <artifactId>nuxeo-runtime</artifactId>
+      <version>${nuxeo.runtime.version}</version>
     </dependency>
     <dependency>
       <groupId>org.nuxeo.ecm.core</groupId>
       <artifactId>nuxeo-core-storage-sql</artifactId>
+      <version>${nuxeo.core.version}</version>
     </dependency>
+
     <dependency>
       <groupId>org.nuxeo.runtime</groupId>
       <artifactId>nuxeo-runtime-datasource</artifactId>
+      <version>${nuxeo.runtime.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.nuxeo.ecm.core</groupId>
       <artifactId>nuxeo-core-storage-sql-test</artifactId>
+      <version>${nuxeo.core.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.nuxeo.ecm.core</groupId>
       <artifactId>nuxeo-core-schema</artifactId>
+      <version>${nuxeo.core.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.nuxeo.ecm.core</groupId>
       <artifactId>nuxeo-core-api</artifactId>
+      <version>${nuxeo.core.version}</version>
     </dependency>
     <dependency>
       <groupId>org.nuxeo.ecm.core</groupId>
       <artifactId>nuxeo-core-query</artifactId>
+      <version>${nuxeo.core.version}</version>
     </dependency>
     <dependency>
       <groupId>org.nuxeo.ecm.core</groupId>
       <artifactId>nuxeo-core</artifactId>
+      <version>${nuxeo.core.version}</version>
     </dependency>
     <dependency>
       <groupId>org.javasimon</groupId>
@@ -65,6 +82,7 @@
     <dependency>
       <groupId>org.nuxeo.ecm.core</groupId>
       <artifactId>nuxeo-core-storage-sql-test</artifactId>
+      <version>${nuxeo.core.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
