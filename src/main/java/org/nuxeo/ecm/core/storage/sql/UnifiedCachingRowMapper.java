@@ -29,6 +29,7 @@ import javax.transaction.xa.Xid;
 import net.sf.ehcache.Cache;
 import net.sf.ehcache.CacheManager;
 import net.sf.ehcache.Element;
+import net.sf.ehcache.config.CacheConfiguration;
 import net.sf.ehcache.management.ManagementService;
 
 import org.apache.commons.logging.Log;
@@ -54,19 +55,8 @@ public class UnifiedCachingRowMapper implements RowMapper {
 
     private static final String ABSENT = "__ABSENT__\0\0\0";
 
-    /**
-     * The cached rows. All held data is identical to what is present in the
-     * underlying {@link RowMapper} and could be refetched if needed.
-     * <p>
-     * The values are either {@link Row} for fragments present in the database,
-     * or a row with tableName {@link #ABSENT} to denote a fragment known to be
-     * absent from the database.
-     * <p>
-     * This cache is memory-sensitive (all values are soft-referenced), a
-     * fragment can always be refetched if the GC collects it.
-     */
-    // we use a new Row instance for the absent case to avoid keeping other
-    // references to it which would prevent its GCing
+    private static CacheManager cacheManager = null;
+
     private Cache cache;
 
     private Model model;
@@ -133,9 +123,9 @@ public class UnifiedCachingRowMapper implements RowMapper {
 
     private static final String CACHE_NAME = "unifiedVCSCache";
 
-    private static final int DEFAULT_CACHE_SIZE = 50000;
+    private static final String CACHE_SIZE_PROP = "maxEntriesLocalHeap";
 
-    private static final String CACHE_SIZE_PROP = "maxElementsInMemory";
+    private static final String CACHE_DISK_SIZE_PROP = "maxEntriesLocalDisk";
 
     private static final String CACHE_ETERNAL_PROP = "eternal";
 
@@ -144,6 +134,10 @@ public class UnifiedCachingRowMapper implements RowMapper {
     private static final String CACHE_TIME_TO_LIVE_PROP = "timeToLiveSeconds";
 
     private static final String CACHE_TIME_TO_IDLE_PROP = "timeToIdleSeconds";
+
+    private static final String CACHE_STATISTICS_PROP = "statistics";
+
+    private static final String CACHE_DISK_PERSISTENT_PROP = "diskPersistent";
 
     private long accessCount;
 
@@ -173,47 +167,61 @@ public class UnifiedCachingRowMapper implements RowMapper {
         eventQueue = repositoryEventQueue;
         this.eventPropagator = eventPropagator;
         eventPropagator.addQueue(repositoryEventQueue);
-        cache = CacheManager.getInstance().getCache(CACHE_NAME);
-        if (cache == null) {
-            CacheManager cacheManager = CacheManager.create();
-            // default cache configuration
-            int maxElementsInMemory = DEFAULT_CACHE_SIZE;
-            boolean overflowToDisk = false;
-            boolean eternal = true;
-            long timeToLiveSeconds = 0;
-            long timeToIdleSeconds = 0;
+        if (cacheManager == null) {
+            cacheManager = CacheManager.create();
+            log.info("Creating ehcache manager for VCS, disk store path: "
+                    + cacheManager.getDiskStorePath());
+            cache = cacheManager.getCache(CACHE_NAME);
+            CacheConfiguration config = cache.getCacheConfiguration();
             // override with properties
             if (properties.containsKey(CACHE_SIZE_PROP)) {
-                maxElementsInMemory = Integer.valueOf(
-                        properties.get(CACHE_SIZE_PROP)).intValue();
+                int value = Integer.valueOf(properties.get(CACHE_SIZE_PROP)).intValue();
+                config.setMaxEntriesLocalHeap(value);
+            }
+            if (properties.containsKey(CACHE_DISK_SIZE_PROP)) {
+                int value = Integer.valueOf(
+                        properties.get(CACHE_DISK_SIZE_PROP)).intValue();
+                config.setMaxEntriesLocalDisk(value);
             }
             if (properties.containsKey(CACHE_ETERNAL_PROP)) {
-                eternal = Boolean.valueOf(properties.get(CACHE_ETERNAL_PROP)).booleanValue();
+                boolean value = Boolean.valueOf(
+                        properties.get(CACHE_ETERNAL_PROP)).booleanValue();
+                config.setEternal(value);
             }
             if (properties.containsKey(CACHE_OVERFLOW_TO_DISK_PROP)) {
-                eternal = Boolean.valueOf(
+                boolean value = Boolean.valueOf(
                         properties.get(CACHE_OVERFLOW_TO_DISK_PROP)).booleanValue();
+                config.setOverflowToDisk(value);
             }
             if (properties.containsKey(CACHE_TIME_TO_LIVE_PROP)) {
-                timeToLiveSeconds = Long.valueOf(
+                long value = Long.valueOf(
                         properties.get(CACHE_TIME_TO_LIVE_PROP)).longValue();
+                config.setTimeToLiveSeconds(value);
             }
             if (properties.containsKey(CACHE_TIME_TO_IDLE_PROP)) {
-                timeToIdleSeconds = Long.valueOf(
+                long value = Long.valueOf(
                         properties.get(CACHE_TIME_TO_IDLE_PROP)).longValue();
+                config.setTimeToIdleSeconds(value);
             }
-            Cache memoryOnlyCache = new Cache(CACHE_NAME, maxElementsInMemory,
-                    overflowToDisk, eternal, timeToLiveSeconds,
-                    timeToIdleSeconds);
-            cacheManager.addCache(memoryOnlyCache);
-            cache = cacheManager.getCache(CACHE_NAME);
-            log.info("Created ehcache for VCS Row, size: "
-                    + maxElementsInMemory);
-            // expose to JMX
+            if (properties.containsKey(CACHE_OVERFLOW_TO_DISK_PROP)) {
+                boolean value = Boolean.valueOf(
+                        properties.get(CACHE_STATISTICS_PROP)).booleanValue();
+                config.setStatistics(value);
+            }
+            if (properties.containsKey(CACHE_DISK_PERSISTENT_PROP)) {
+                boolean value = Boolean.valueOf(
+                        properties.get(CACHE_DISK_PERSISTENT_PROP)).booleanValue();
+                config.setDiskPersistent(value);
+            }
+
+            log.info("Creating ehcache " + CACHE_NAME + " size: "
+                    + config.getMaxEntriesLocalHeap());
+            // Exposes cache to JMX
             MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
-            ManagementService.registerMBeans(cacheManager, mBeanServer, false,
-                    false, false, true);
+            ManagementService.registerMBeans(cacheManager, mBeanServer, true,
+                    true, true, true);
         }
+        cache = cacheManager.getCache(CACHE_NAME);
     }
 
     public void close() throws StorageException {
