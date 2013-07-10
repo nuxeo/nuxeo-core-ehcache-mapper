@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.management.MBeanServer;
 import javax.transaction.xa.XAException;
@@ -139,6 +140,8 @@ public class UnifiedCachingRowMapper implements RowMapper {
 
     private static final String CACHE_DISK_PERSISTENT_PROP = "diskPersistent";
 
+    private static AtomicInteger rowMapperCount = new AtomicInteger();
+
     private long accessCount;
 
     private long hitsCount;
@@ -182,6 +185,7 @@ public class UnifiedCachingRowMapper implements RowMapper {
                 int value = Integer.valueOf(
                         properties.get(CACHE_DISK_SIZE_PROP)).intValue();
                 config.setMaxEntriesLocalDisk(value);
+                config.setMaxElementsOnDisk(value);
             }
             if (properties.containsKey(CACHE_ETERNAL_PROP)) {
                 boolean value = Boolean.valueOf(
@@ -213,7 +217,6 @@ public class UnifiedCachingRowMapper implements RowMapper {
                         properties.get(CACHE_DISK_PERSISTENT_PROP)).booleanValue();
                 config.setDiskPersistent(value);
             }
-
             log.info("Creating ehcache " + CACHE_NAME + " size: "
                     + config.getMaxEntriesLocalHeap());
             // Exposes cache to JMX
@@ -221,13 +224,19 @@ public class UnifiedCachingRowMapper implements RowMapper {
             ManagementService.registerMBeans(cacheManager, mBeanServer, true,
                     true, true, true);
         }
+        rowMapperCount.incrementAndGet();
         cache = cacheManager.getCache(CACHE_NAME);
+
     }
 
     public void close() throws StorageException {
         cachePropagator.removeQueue(cacheQueue);
         eventPropagator.removeQueue(eventQueue); // TODO can be overriden
         logCacheStat();
+        if (rowMapperCount.decrementAndGet() == 0) {
+            log.info("Shutdown ehcache manager");
+            cacheManager.shutdown();
+        }
     }
 
     /*
