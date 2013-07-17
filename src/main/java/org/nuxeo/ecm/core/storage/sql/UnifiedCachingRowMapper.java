@@ -24,13 +24,15 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.management.MBeanServer;
+import javax.transaction.SystemException;
+import javax.transaction.Transaction;
+import javax.transaction.TransactionManager;
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.Xid;
 
 import net.sf.ehcache.Cache;
 import net.sf.ehcache.CacheManager;
 import net.sf.ehcache.Element;
-import net.sf.ehcache.config.CacheConfiguration;
 import net.sf.ehcache.management.ManagementService;
 import net.sf.ehcache.transaction.manager.TransactionManagerLookup;
 
@@ -58,6 +60,8 @@ public class UnifiedCachingRowMapper implements RowMapper {
     private static final String ABSENT = "__ABSENT__\0\0\0";
 
     private static CacheManager cacheManager = null;
+
+    protected static boolean isXA;
 
     private Cache cache;
 
@@ -183,6 +187,8 @@ public class UnifiedCachingRowMapper implements RowMapper {
                 log.info("Creating ehcache manager for VCS, No ehcache file provided");
                 cacheManager = CacheManager.create();
             }
+            isXA = cacheManager.getConfiguration().getCacheConfigurations().get(
+                    CACHE_NAME).isXaTransactional();
             // Exposes cache to JMX
             MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
             ManagementService.registerMBeans(cacheManager, mBeanServer, true,
@@ -197,6 +203,65 @@ public class UnifiedCachingRowMapper implements RowMapper {
         eventPropagator.removeQueue(eventQueue); // TODO can be overriden
         logCacheStat();
         rowMapperCount.decrementAndGet();
+    }
+
+    /*
+     * ----- ehcache -----
+     */
+
+    protected boolean hasTransaction() {
+        TransactionManagerLookup transactionManagerLookup = cache.getTransactionManagerLookup();
+        if (transactionManagerLookup == null) {
+            return false;
+        }
+        TransactionManager transactionManager = transactionManagerLookup.getTransactionManager();
+        if (transactionManager == null) {
+            return false;
+        }
+        Transaction transaction;
+        try {
+            transaction = transactionManager.getTransaction();
+        } catch (SystemException e) {
+            throw new RuntimeException(e);
+        }
+        return transaction != null;
+    }
+
+    protected boolean useEhCache() {
+        return isXA && hasTransaction();
+    }
+
+    protected void ehCachePut(Element element) {
+        if (useEhCache()) {
+            cache.put(element);
+        }
+    }
+
+    protected Element ehCacheGet(Serializable key) {
+        if (useEhCache()) {
+            return cache.get(key);
+        }
+        return null;
+    }
+
+    protected int ehCacheGetSize() {
+        if (useEhCache()) {
+            return cache.getSize();
+        }
+        return 0;
+    }
+
+    protected boolean ehCacheRemove(Serializable key) {
+        if (useEhCache()) {
+            return cache.remove(key);
+        }
+        return false;
+    }
+
+    protected void ehCacheRemoveAll() {
+        if (useEhCache()) {
+            cache.removeAll();
+        }
     }
 
     /*
@@ -217,7 +282,7 @@ public class UnifiedCachingRowMapper implements RowMapper {
             row.values = sortACLRows((ACLRow[]) row.values);
         }
         Element element = new Element(new RowId(row), row);
-        cache.put(element);
+        ehCachePut(element);
     }
 
     protected ACLRow[] sortACLRows(ACLRow[] acls) {
@@ -230,7 +295,7 @@ public class UnifiedCachingRowMapper implements RowMapper {
     protected void cachePutAbsent(RowId rowId) {
         Element element = new Element(new RowId(rowId), new Row(ABSENT,
                 (Serializable) null));
-        cache.put(element);
+        ehCachePut(element);
     }
 
     protected void cachePutAbsentIfNull(RowId rowId, Row row) {
@@ -255,7 +320,7 @@ public class UnifiedCachingRowMapper implements RowMapper {
             Stopwatch stopWatch = SimonManager.getStopwatch(SW_CACHE);
             split = stopWatch.start();
         }
-        Element element = cache.get(rowId);
+        Element element = ehCacheGet(rowId);
         Row row = null;
         if (element != null) {
             row = (Row) element.getObjectValue();
@@ -282,13 +347,13 @@ public class UnifiedCachingRowMapper implements RowMapper {
             hitsCounter.increase(hitsCount);
             hitsCount = 0;
             Counter sizeCounter = SimonManager.getCounter(CN_SIZE);
-            long delta = cache.getSize() - cacheSize;
+            long delta = ehCacheGetSize() - cacheSize;
             if (delta > 0) {
                 sizeCounter.increase(delta);
             } else if (delta < 0) {
                 sizeCounter.decrease(-1 * delta);
             }
-            cacheSize = cache.getSize();
+            cacheSize = ehCacheGetSize();
         }
     }
 
@@ -308,7 +373,7 @@ public class UnifiedCachingRowMapper implements RowMapper {
     }
 
     protected void cacheRemove(RowId rowId) {
-        cache.remove(rowId);
+        ehCacheRemove(rowId);
     }
 
     /*
@@ -397,7 +462,7 @@ public class UnifiedCachingRowMapper implements RowMapper {
 
     @Override
     public void clearCache() {
-        cache.removeAll();
+        ehCacheRemoveAll();
         localInvalidations.clear();
         rowMapper.clearCache();
     }
@@ -407,7 +472,7 @@ public class UnifiedCachingRowMapper implements RowMapper {
         try {
             rowMapper.rollback(xid);
         } finally {
-            cache.removeAll();
+            ehCacheRemoveAll();
             localInvalidations.clear();
         }
     }
