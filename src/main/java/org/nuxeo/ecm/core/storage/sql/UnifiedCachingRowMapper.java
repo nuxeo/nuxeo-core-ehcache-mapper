@@ -228,7 +228,7 @@ public class UnifiedCachingRowMapper implements RowMapper {
     }
 
     protected boolean useEhCache() {
-        return isXA && hasTransaction();
+        return !isXA || hasTransaction();
     }
 
     protected void ehCachePut(Element element) {
