@@ -1,29 +1,9 @@
 # Nuxeo Unified VCS Row Cache
 
-This addon implements a VCS CachingMapper that use a unified ehcache.
-This is an EXPERIMENTAL implementation, not for production use.
+This addon is now part of the standard Nuxeo codebase since Nuxeo 5.7.2.
 
-## Configuration
-
-The name of the ehcache is "unifiedVCSCache".
-
-To enable this addon you need to configure the repository by adding the 
-following configuration in "default-repository-config.xml" inside the "repository"
-tag:
-
-    <cachingMapper enabled="true" class="org.nuxeo.ecm.core.storage.sql.UnifiedCachingMapper">
-      <property name="ehcacheFilePath">/full/path/to/vcs-ehcache.xml</property>
-    </cachingMapper>
-
-
-There are 2 examples of ehcache configuration in the
-src/main/resources/ directory, there is one that enable the ehcache XA
-mode and should provide the same isolation as the default SoftRef
-cache.
-
-Please refer to [ehcache documentation] [5] for information about the ehcache configuration.
-
-[5]: http://ehcache.org/apidocs/net/sf/ehcache/Cache.html#Cache%28java.lang.String,%20int,%20boolean,%20boolean,%20long,%20long%29
+This git repository still contains branches for the variants usable with older Nuxeo versions,
+see the available branches.
 
 ## About Nuxeo
 
